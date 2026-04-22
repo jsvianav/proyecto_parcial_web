@@ -7,10 +7,10 @@ import TypeFilter from '../components/search/TypeFilter'
 import ArtistCard from '../components/cards/ArtistCard'
 import AlbumCard from '../components/cards/AlbumCard'
 import TrackCard from '../components/cards/TrackCard'
-import LoadingSpinner from '../components/ui/LoadingSpinner'
-import ErrorMessage from '../components/ui/ErrorMessage'
+import SkeletonCard from '../components/ui/SkeletonCard'
 import EmptyState from '../components/ui/EmptyState'
-import Pagination from '../components/ui/Pagination'
+import CardGrid from '../components/ui/CardGrid'
+import SecTitle from '../components/ui/SecTitle'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 
 const LIMIT = 20
@@ -19,7 +19,7 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [inputValue, setInputValue] = useState(searchParams.get('q') || '')
-  const [type, setType] = useState('all')
+  const [type, setType]     = useState('all')
   const [offset, setOffset] = useState(0)
   const [, setRecents] = useLocalStorage('spotify_recent_searches', [])
 
@@ -35,123 +35,127 @@ export default function SearchPage() {
   const { data, loading, error } = useSpotifySearch(activeQuery, type, offset)
 
   function handleSearch(q) {
-    setRecents((prev) => {
-      const filtered = prev.filter((r) => r !== q)
-      return [q, ...filtered].slice(0, 5)
-    })
+    setRecents(prev => [q, ...prev.filter(r => r !== q)].slice(0, 6))
     navigate(`/search?q=${encodeURIComponent(q)}`)
     setOffset(0)
   }
 
-  function handleTypeChange(t) {
-    setType(t)
-    setOffset(0)
-  }
+  function handleType(t) { setType(t); setOffset(0) }
 
-  // Collect all results across sections
-  const artists = data?.artists?.items || []
-  const albums = data?.albums?.items || []
-  const tracks = data?.tracks?.items || []
+  const artists = (type === 'all' || type === 'artist') ? (data?.artists?.items || []) : []
+  const albums  = (type === 'all' || type === 'album')  ? (data?.albums?.items  || []) : []
+  const tracks  = (type === 'all' || type === 'track')  ? (data?.tracks?.items  || []) : []
+  const total   = artists.length + albums.length + tracks.length
+  const hasRes  = total > 0
 
-  // For pagination total, use the relevant section
-  const total =
-    type === 'artist'
-      ? data?.artists?.total || 0
-      : type === 'album'
-      ? data?.albums?.total || 0
-      : type === 'track'
-      ? data?.tracks?.total || 0
-      : Math.max(data?.artists?.total || 0, data?.albums?.total || 0, data?.tracks?.total || 0)
-
-  const hasResults = artists.length > 0 || albums.length > 0 || tracks.length > 0
+  const totalPages = Math.ceil(
+    Math.max(data?.artists?.total || 0, data?.albums?.total || 0, data?.tracks?.total || 0) / LIMIT
+  )
+  const page = Math.floor(offset / LIMIT) + 1
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <SearchBar
-          initialValue={inputValue}
-          onSearch={handleSearch}
-          autoFocus
-        />
-      </div>
+    <div className="page-anim" style={{ minHeight: '100vh', paddingTop: 62 }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '28px 28px 64px' }}>
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
-        <TypeFilter value={type} onChange={handleTypeChange} />
-        {activeQuery && (
-          <p className="text-white/40 text-sm ml-auto">
-            {total > 0 ? `${total.toLocaleString()} resultados` : ''}
-          </p>
+        <div style={{ marginBottom: 20 }}>
+          <SearchBar value={inputValue} onChange={setInputValue} onSearch={handleSearch} autoFocus={!activeQuery} />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
+          <TypeFilter value={type} onChange={handleType} />
+          {activeQuery && !loading && hasRes && (
+            <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+              {total} resultado{total !== 1 ? 's' : ''} para{' '}
+              <strong style={{ color: 'var(--text-secondary)' }}>"{activeQuery}"</strong>
+            </span>
+          )}
+        </div>
+
+        {/* Empty */}
+        {!activeQuery && (
+          <EmptyState
+            icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>}
+            title="Empieza a buscar"
+            description="Escribe el nombre de un artista, álbum o canción para explorar."
+          />
+        )}
+
+        {/* Skeleton */}
+        {activeQuery && loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {[0, 1, 2].map(s => (
+              <div key={s}>
+                <div className="skeleton" style={{ height: 16, width: 100, marginBottom: 14, borderRadius: 6 }} />
+                <CardGrid>{[0,1,2,3,4].map(i => <SkeletonCard key={i} />)}</CardGrid>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error */}
+        {activeQuery && !loading && error && (
+          <EmptyState
+            icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
+            title="Error al buscar" description={error}
+            action="Reintentar" onAction={() => setOffset(o => o)}
+          />
+        )}
+
+        {/* Results */}
+        {!loading && !error && hasRes && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+            {artists.length > 0 && (
+              <section>
+                {type === 'all' && <SecTitle count={artists.length}>Artistas</SecTitle>}
+                <CardGrid>{artists.map((a, i) => <ArtistCard key={a.id} artist={a} idx={i} />)}</CardGrid>
+              </section>
+            )}
+            {albums.length > 0 && (
+              <section>
+                {type === 'all' && <SecTitle count={albums.length}>Álbumes</SecTitle>}
+                <CardGrid>{albums.map((a, i) => <AlbumCard key={a.id} album={a} idx={i} />)}</CardGrid>
+              </section>
+            )}
+            {tracks.length > 0 && (
+              <section>
+                {type === 'all' && <SecTitle count={tracks.length}>Canciones</SecTitle>}
+                <CardGrid>{tracks.map((t, i) => <TrackCard key={t.id} track={t} idx={i} />)}</CardGrid>
+              </section>
+            )}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 20 }}>
+                <PagBtn disabled={page <= 1} onClick={() => setOffset(o => Math.max(0, o - LIMIT))}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </PagBtn>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)', minWidth: 110, textAlign: 'center' }}>
+                  Página <strong style={{ color: 'var(--text-primary)' }}>{page}</strong> de {totalPages}
+                </span>
+                <PagBtn disabled={page >= totalPages} onClick={() => setOffset(o => o + LIMIT)}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </PagBtn>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!loading && !error && activeQuery && !hasRes && data !== null && (
+          <EmptyState title="Sin resultados"
+            description={`No encontramos nada para "${activeQuery}". Prueba otros términos.`} />
         )}
       </div>
-
-      {!activeQuery && (
-        <EmptyState
-          icon="🔍"
-          title="Empieza a buscar"
-          description="Escribe el nombre de un artista, álbum o canción."
-        />
-      )}
-
-      {activeQuery && loading && <LoadingSpinner />}
-
-      {activeQuery && !loading && error && (
-        <ErrorMessage
-          message={error}
-          onRetry={() => setOffset((o) => o)}
-        />
-      )}
-
-      {activeQuery && !loading && !error && !hasResults && (
-        <EmptyState
-          title="Sin resultados"
-          description={`No encontramos nada para "${activeQuery}".`}
-        />
-      )}
-
-      {!loading && !error && hasResults && (
-        <div className="space-y-10">
-          {(type === 'all' || type === 'artist') && artists.length > 0 && (
-            <section>
-              {type === 'all' && (
-                <h2 className="text-white font-bold text-xl mb-4">Artistas</h2>
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {artists.map((a) => <ArtistCard key={a.id} artist={a} />)}
-              </div>
-            </section>
-          )}
-
-          {(type === 'all' || type === 'album') && albums.length > 0 && (
-            <section>
-              {type === 'all' && (
-                <h2 className="text-white font-bold text-xl mb-4">Álbumes</h2>
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {albums.map((a) => <AlbumCard key={a.id} album={a} />)}
-              </div>
-            </section>
-          )}
-
-          {(type === 'all' || type === 'track') && tracks.length > 0 && (
-            <section>
-              {type === 'all' && (
-                <h2 className="text-white font-bold text-xl mb-4">Canciones</h2>
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {tracks.map((t) => <TrackCard key={t.id} track={t} />)}
-              </div>
-            </section>
-          )}
-
-          <Pagination
-            offset={offset}
-            limit={LIMIT}
-            total={total}
-            onPrev={() => setOffset((o) => Math.max(0, o - LIMIT))}
-            onNext={() => setOffset((o) => o + LIMIT)}
-          />
-        </div>
-      )}
     </div>
+  )
+}
+
+function PagBtn({ children, onClick, disabled }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: 36, height: 36, borderRadius: 9, background: 'var(--bg-elevated)',
+      border: '1px solid var(--border-default)', cursor: disabled ? 'not-allowed' : 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: disabled ? 'var(--text-tertiary)' : 'var(--text-primary)',
+      opacity: disabled ? 0.4 : 1, transition: 'all 0.15s',
+    }}>{children}</button>
   )
 }
