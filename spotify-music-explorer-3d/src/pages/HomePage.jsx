@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { getArtist, getAlbum } from '../services/spotifyAPI'
 import VinylDisc from '../components/three/VinylDisc'
 import SearchBar from '../components/search/SearchBar'
 import ArtistCard from '../components/cards/ArtistCard'
@@ -8,24 +9,34 @@ import AlbumCard from '../components/cards/AlbumCard'
 import GenreCard, { GENRES } from '../components/ui/GenreCard'
 import CardGrid from '../components/ui/CardGrid'
 import SecTitle from '../components/ui/SecTitle'
+import SkeletonCard from '../components/ui/SkeletonCard'
 
-const FEAT_ARTISTS = [
-  { id: '06HL4z0CvFAxyc27GXpf02', name: 'Taylor Swift',  followers:{total:85000000}, popularity:100, genres:['pop','country pop'],   imageUrl:'https://picsum.photos/seed/taylorswift/300/300' },
-  { id: '4q3ewBCX7sLwd24euuV69X', name: 'Bad Bunny',     followers:{total:45000000}, popularity:97,  genres:['reggaeton','trap'],    imageUrl:'https://picsum.photos/seed/badbunnypr/300/300' },
-  { id: '1Xyo4u8uXC1ZmMpatF05PJ', name: 'The Weeknd',    followers:{total:62000000}, popularity:96,  genres:['r&b','synth-pop'],    imageUrl:'https://picsum.photos/seed/theweekndxo/300/300' },
-  { id: '6qqNVTkY8uBg9cP3Jd7DAH', name: 'Billie Eilish', followers:{total:58000000}, popularity:95,  genres:['art pop','dark pop'], imageUrl:'https://picsum.photos/seed/billieeilish2/300/300' },
-]
-const FEAT_ALBUMS = [
-  { id: '151w1FgRZfnKZA9FEcg9Z3', name: 'Midnights',         artists:[{name:'Taylor Swift'}],  release_date:'2022-10-21', total_tracks:13, imageUrl:'https://picsum.photos/seed/midnights22/300/300' },
-  { id: '3RQQmkQEvNCY4prGKE6oc5', name: 'Un Verano Sin Ti',  artists:[{name:'Bad Bunny'}],     release_date:'2022-05-06', total_tracks:23, imageUrl:'https://picsum.photos/seed/veranobunny1/300/300' },
-  { id: '4yP0hdKOZPNshxUOjY0cZj', name: 'After Hours',       artists:[{name:'The Weeknd'}],    release_date:'2020-03-20', total_tracks:14, imageUrl:'https://picsum.photos/seed/afterhours99/300/300' },
-  { id: '0JGOiO34nwfUdDrD612dOp', name: 'Happier Than Ever', artists:[{name:'Billie Eilish'}], release_date:'2021-07-30', total_tracks:16, imageUrl:'https://picsum.photos/seed/happierthan1/300/300' },
-]
+const ARTIST_IDS = ['06HL4z0CvFAxyc27GXpf02','4q3ewBCX7sLwd24euuV69X','1Xyo4u8uXC1ZmMpatF05PJ','6qqNVTkY8uBg9cP3Jd7DAH']
+const ALBUM_IDS  = ['151w1FgRZfnKZA9FEcg9Z3','3RQQmkQEvNCY4prGKE6oc5','4yP0hdKOZPNshxUOjY0cZj','0JGOiO34nwfUdDrD612dOp']
 
 export default function HomePage() {
   const navigate  = useNavigate()
   const [recents] = useLocalStorage('spotify_recent_searches', [])
   const [q, setQ] = useState('')
+  const [featArtists, setFeatArtists] = useState([])
+  const [featAlbums,  setFeatAlbums]  = useState([])
+  const [loadingFeat, setLoadingFeat] = useState(true)
+
+  useEffect(() => {
+    Promise.allSettled([
+      ...ARTIST_IDS.map(id => getArtist(id)),
+      ...ALBUM_IDS.map(id => getAlbum(id)),
+    ]).then(results => {
+      setFeatArtists(
+        results.slice(0, ARTIST_IDS.length)
+          .filter(r => r.status === 'fulfilled').map(r => r.value)
+      )
+      setFeatAlbums(
+        results.slice(ARTIST_IDS.length)
+          .filter(r => r.status === 'fulfilled').map(r => r.value)
+      )
+    }).finally(() => setLoadingFeat(false))
+  }, [])
 
   return (
     <div className="page-anim" style={{ minHeight: '100vh', paddingTop: 62 }}>
@@ -91,7 +102,7 @@ export default function HomePage() {
           </div>
 
           {/* Vinyl */}
-          <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px 8px', zIndex: 1 }}>
+          <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px 8px', zIndex: 1, overflow: 'visible' }}>
             <VinylDisc size={380} spinning />
           </div>
         </div>
@@ -109,7 +120,10 @@ export default function HomePage() {
       <section style={{ maxWidth: 1280, margin: '0 auto', padding: '0 28px 48px' }}>
         <SecTitle>Artistas destacados</SecTitle>
         <CardGrid>
-          {FEAT_ARTISTS.map((a, i) => <ArtistCard key={a.id} artist={a} idx={i} />)}
+          {loadingFeat
+            ? ARTIST_IDS.map(id => <SkeletonCard key={id} />)
+            : featArtists.map((a, i) => <ArtistCard key={a.id} artist={a} idx={i} />)
+          }
         </CardGrid>
       </section>
 
@@ -117,7 +131,10 @@ export default function HomePage() {
       <section style={{ maxWidth: 1280, margin: '0 auto', padding: '0 28px 72px' }}>
         <SecTitle>Álbumes destacados</SecTitle>
         <CardGrid>
-          {FEAT_ALBUMS.map((a, i) => <AlbumCard key={a.id} album={a} idx={i} />)}
+          {loadingFeat
+            ? ALBUM_IDS.map(id => <SkeletonCard key={id} />)
+            : featAlbums.map((a, i) => <AlbumCard key={a.id} album={a} idx={i} />)
+          }
         </CardGrid>
       </section>
     </div>

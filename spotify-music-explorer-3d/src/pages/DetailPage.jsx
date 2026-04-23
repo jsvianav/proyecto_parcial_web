@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getArtist, getArtistTopTracks, getArtistAlbums, getAlbum, getTrack } from '../services/spotifyAPI'
+import { getArtist, getArtistTopTracks, getArtistAlbums, getAlbum, getTrack, searchSpotify } from '../services/spotifyAPI'
 import { useFavorites } from '../context/FavoritesContext'
 import { usePlayer } from '../context/PlayerContext'
 import { showToast } from '../utils/toast'
-import VinylDisc from '../components/three/VinylDisc'
 import AlbumCard from '../components/cards/AlbumCard'
 import CardGrid from '../components/ui/CardGrid'
 import SecTitle from '../components/ui/SecTitle'
@@ -17,13 +16,13 @@ function fmtMs(ms) {
 }
 
 function fmtNum(n) {
-  if (!n) return '0'
+  if (!n) return '—'
   if (n >= 1e6) return (n / 1e6).toFixed(1).replace('.0', '') + 'M'
   if (n >= 1e3) return (n / 1e3).toFixed(1).replace('.0', '') + 'K'
   return String(n)
 }
 
-function TrackRow({ track, index }) {
+function TrackRow({ track, index, fallbackImg }) {
   const { play, pause, currentTrack, isPlaying } = usePlayer()
   const { isFavorite, addFavorite, removeFavorite } = useFavorites()
   const [hov, setHov] = useState(false)
@@ -36,6 +35,7 @@ function TrackRow({ track, index }) {
         display: 'flex', alignItems: 'center', gap: 14, padding: '9px 12px', borderRadius: 8,
         background: hov ? 'var(--bg-elevated)' : 'transparent', transition: 'background 0.15s',
       }}>
+      {/* Index / play button */}
       <div style={{ width: 22, textAlign: 'right', flexShrink: 0, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         {hov
           ? <button onClick={() => { if (track.preview_url) { active ? pause() : play(track) } }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: 0, display: 'flex' }}>
@@ -47,12 +47,22 @@ function TrackRow({ track, index }) {
           : <span style={{ fontSize: 13, color: active ? 'var(--accent)' : 'var(--text-tertiary)', fontWeight: active ? 600 : 400 }}>{index + 1}</span>
         }
       </div>
+      {/* Album thumb */}
+      <div style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', background: 'var(--bg-elevated)', flexShrink: 0 }}>
+        {(track.album?.images?.[0]?.url || fallbackImg) && (
+          <img src={track.album?.images?.[track.album.images.length - 1]?.url || track.album?.images?.[0]?.url || fallbackImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+      </div>
+      {/* Name + artist */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: 14, fontWeight: active ? 600 : 400,
           color: active ? 'var(--accent)' : 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>{track.name}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {track.artists?.map(a => a.name).join(', ')}
+        </div>
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-tertiary)', flexShrink: 0 }}>{fmtMs(track.duration_ms)}</div>
       <button onClick={() => {
@@ -91,10 +101,47 @@ export default function DetailPage({ type }) {
     async function load() {
       try {
         if (type === 'artist') {
-          const [artist, topTracks, albums] = await Promise.all([
-            getArtist(id), getArtistTopTracks(id), getArtistAlbums(id),
-          ])
-          if (!cancelled) { setData(artist); setExtras({ topTracks: topTracks.tracks, albums: albums.items }) }
+          const artist = await getArtist(id)
+          if (cancelled) return
+
+          // Followers: client-credentials sometimes returns 0 — try search as fallback
+          if (!(artist.followers?.total > 0) && artist.name) {
+            try {
+              const sr = await searchSpotify(artist.name, ['artist'], 0)
+              const match = sr?.artists?.items?.find(a => a.id === id)
+              if (match?.followers?.total > 0) {
+                artist.followers = match.followers
+                if (!artist.popularity && match.popularity) artist.popularity = match.popularity
+                if (!artist.genres?.length && match.genres?.length) artist.genres = match.genres
+              }
+            } catch (_) {}
+          }
+
+          // Top tracks: try dedicated endpoint, fall back to search
+          let topTracks = []
+          try {
+            const r = await getArtistTopTracks(id)
+            topTracks = r.tracks || []
+          } catch (_) {
+            try {
+              const r = await searchSpotify(`"${artist.name}"`, ['track'], 0)
+              topTracks = (r?.tracks?.items || []).filter(t =>
+                t.artists?.some(a => a.id === id)
+              )
+            } catch (_) {}
+          }
+
+          // Albums
+          let albums = []
+          try {
+            const r = await getArtistAlbums(id)
+            albums = r.items || []
+          } catch (_) {}
+
+          if (!cancelled) {
+            setData(artist)
+            setExtras({ topTracks: topTracks.slice(0, 10), albums })
+          }
         } else if (type === 'album') {
           const album = await getAlbum(id)
           if (!cancelled) setData(album)
@@ -184,8 +231,13 @@ export default function DetailPage({ type }) {
 
         {/* Hero row */}
         <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 52 }}>
-          <div style={{ flexShrink: 0 }}>
-            <VinylDisc imageUrl={img} size={240} spinning={isCurrentPlaying} />
+          <div style={{ flexShrink: 0, width: 240, height: 240, borderRadius: type === 'artist' ? '50%' : 16, overflow: 'hidden', background: 'var(--bg-elevated)', boxShadow: '0 8px 48px rgba(0,0,0,0.5)' }}>
+            {img
+              ? <img src={img} alt={data.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+            }
           </div>
 
           <div style={{ flex: '1 1 280px', minWidth: 240 }}>
@@ -199,11 +251,15 @@ export default function DetailPage({ type }) {
 
             {type === 'artist' && (
               <>
-                <div style={{ display: 'flex', gap: 28, marginBottom: 14 }}>
-                  <Stat label="Seguidores" value={fmtNum(data.followers?.total)} />
-                  <Stat label="Popularidad" value={data.popularity} />
+                <div style={{ display: 'flex', gap: 28, marginBottom: 14, flexWrap: 'wrap' }}>
+                  {data.followers?.total > 0 && (
+                    <Stat label="Oyentes mensuales" value={fmtNum(data.followers.total)} />
+                  )}
+                  {data.popularity > 0 && (
+                    <Stat label="Popularidad" value={`${data.popularity} / 100`} />
+                  )}
                 </div>
-                <PopBar width={popW} />
+                {data.popularity > 0 && <PopBar width={popW} />}
                 {data.genres?.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 16 }}>
                     {data.genres.slice(0, 5).map(g => <GenrePill key={g}>{g}</GenrePill>)}
@@ -272,7 +328,7 @@ export default function DetailPage({ type }) {
           <section>
             <SecTitle>{type === 'artist' ? 'Top Canciones' : 'Canciones'}</SecTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {tracks.map((t, i) => <TrackRow key={t.id} track={t} index={i} />)}
+              {tracks.map((t, i) => <TrackRow key={t.id} track={t} index={i} fallbackImg={type === 'album' ? img : undefined} />)}
             </div>
           </section>
         )}

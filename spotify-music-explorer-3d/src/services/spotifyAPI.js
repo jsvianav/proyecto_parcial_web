@@ -99,7 +99,7 @@ export async function searchSpotify(
   const url = buildUrl('https://api.spotify.com/v1/search', {
     q: query,
     type: types.join(','),
-    limit: 20,
+    limit: 10,
     offset: Math.floor(Number(offset)) || 0,
   })
   return spotifyFetch(url)
@@ -111,13 +111,13 @@ export async function getArtist(id) {
 
 export async function getArtistTopTracks(id) {
   return spotifyFetch(
-    `https://api.spotify.com/v1/artists/${id}/top-tracks?market=CO`
+    `https://api.spotify.com/v1/artists/${id}/top-tracks?market=US`
   )
 }
 
 export async function getArtistAlbums(id) {
   return spotifyFetch(
-    `https://api.spotify.com/v1/artists/${id}/albums?limit=20`
+    `https://api.spotify.com/v1/artists/${id}/albums?market=US&include_groups=album,single&limit=10`
   )
 }
 

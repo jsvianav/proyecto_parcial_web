@@ -13,7 +13,7 @@ import CardGrid from '../components/ui/CardGrid'
 import SecTitle from '../components/ui/SecTitle'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 
-const LIMIT = 20
+const LIMIT = 10
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams()

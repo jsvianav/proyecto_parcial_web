@@ -92,12 +92,13 @@ export default function VinylDisc({ imageUrl, size = 300, spinning = true }) {
     renderer.shadowMap.type    = THREE.PCFSoftShadowMap
     renderer.toneMapping       = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.35
+    renderer.setClearColor(0x000000, 0)
     el.appendChild(renderer.domElement)
 
     const scene  = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50)
-    camera.position.set(0, 1.4, 5.2)
-    camera.lookAt(0, 0.2, 0)
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 50)
+    camera.position.set(0, 1.4, 6.4)
+    camera.lookAt(0, 0.1, 0)
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.22))
 
@@ -275,7 +276,8 @@ export default function VinylDisc({ imageUrl, size = 300, spinning = true }) {
       ref={mountRef}
       style={{
         width: size, height: size, flexShrink: 0, cursor: 'pointer',
-        filter: 'drop-shadow(0 0 56px rgba(29,185,84,0.22)) drop-shadow(0 36px 72px rgba(0,0,0,0.75))',
+        position: 'relative', overflow: 'visible',
+        filter: 'drop-shadow(0 0 72px rgba(29,185,84,0.30))',
       }}
     />
   )
