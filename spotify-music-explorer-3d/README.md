@@ -3,11 +3,6 @@
 > Proyecto académico — Parcial universitario
 
 Una aplicación web interactiva que permite explorar música usando la **Spotify Web API**, con un disco de vinilo 3D como elemento central de la experiencia.
-
-![Screenshot Home](./screenshots/home.png)
-![Screenshot Search](./screenshots/search.png)
-![Screenshot Detail](./screenshots/detail.png)
-
 ---
 
 ## 🛠️ Stack tecnológico
@@ -165,7 +160,6 @@ El elemento 3D central es un **disco de vinilo** construido con:
 ### Características del vinilo
 
 - **Geometría:** `CylinderGeometry` con material negro metálico + surcos con `TorusGeometry`
-- **Etiqueta central:** carga la portada del álbum/artista como textura con `useTexture`
 - **Rotación automática:** ~0.3 rad/s en reposo, ~2 rad/s al reproducir un preview
 - **Interacción:** arrastrable con el mouse via `OrbitControls`
 - **Piso reflectivo:** `MeshReflectorMaterial` para un efecto espejo elegante
@@ -192,7 +186,7 @@ El elemento 3D central es un **disco de vinilo** construido con:
 >
 > Para producción, la alternativa correcta es crear una **Vercel Serverless Function** (o cualquier backend) que maneje la autenticación con Spotify y devuelva el token al cliente sin exponer el secret.
 >
-> Para un **proyecto académico** como este, es aceptable.
+
 
 ---
 
