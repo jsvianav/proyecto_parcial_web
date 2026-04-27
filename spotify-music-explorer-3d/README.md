@@ -136,18 +136,6 @@ Body: grant_type=client_credentials
 
 El token se cachea en memoria y se renueva automáticamente cuando expira (cada hora).
 
-### Endpoints consumidos
-
-| Endpoint | Uso |
-|----------|-----|
-| `GET /v1/search` | Búsqueda de artistas, álbumes y canciones |
-| `GET /v1/artists/{id}` | Perfil de un artista |
-| `GET /v1/artists/{id}/top-tracks` | Top 10 tracks del artista |
-| `GET /v1/artists/{id}/albums` | Discografía del artista |
-| `GET /v1/albums/{id}` | Detalle de un álbum + tracklist |
-| `GET /v1/tracks/{id}` | Detalle de una canción |
-
----
 
 ## 🎮 Integración 3D: Disco de Vinilo
 
@@ -187,3 +175,6 @@ El elemento 3D central es un **disco de vinilo** construido con:
 > Para producción, la alternativa correcta es crear una **Vercel Serverless Function** (o cualquier backend) que maneje la autenticación con Spotify y devuelva el token al cliente sin exponer el secret.
 >
 
+## Hecho por 
+- John Sebastian Viana Vargas
+-Sebastian Baquero Alvarez
