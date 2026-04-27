@@ -187,16 +187,3 @@ El elemento 3D central es un **disco de vinilo** construido con:
 > Para producción, la alternativa correcta es crear una **Vercel Serverless Function** (o cualquier backend) que maneje la autenticación con Spotify y devuelva el token al cliente sin exponer el secret.
 >
 
-
----
-
-## 📄 Licencia
-
-MIT
-
----
-
-## 👨‍💻 Autores
-
-- Desarrollado como proyecto parcial universitario
-- Powered by [Spotify Web API](https://developer.spotify.com/documentation/web-api)
