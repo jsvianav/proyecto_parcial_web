@@ -177,4 +177,4 @@ El elemento 3D central es un **disco de vinilo** construido con:
 
 ## Hecho por 
 - John Sebastian Viana Vargas
--Sebastian Baquero Alvarez
+- Sebastian Baquero Alvarez
